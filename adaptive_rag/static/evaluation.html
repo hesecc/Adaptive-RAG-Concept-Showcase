@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#2b2a28" />
+  <title>评测报告 · Adaptive RAG</title>
+  <link rel="icon" href="/static/mark.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/static/app.css" />
+  <link rel="stylesheet" href="/static/evaluation.css" />
+  <script src="/static/domain-controls.js" defer></script>
+  <script src="/static/evaluation.js" defer></script>
+</head>
+<body class="evaluation-page">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Adaptive RAG 首页"><svg class="brand-mark" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect class="m-fill" width="36" height="36" rx="10" /><path class="m-cut" d="M18 6 32 30H4Z" /><path class="m-fill" d="m18 16 8 14H10Z" /></svg><b>Adaptive RAG</b></a>
+    <nav class="tabs" aria-label="页面"><a class="tab" href="/">检索工作台</a><a class="tab" href="/images">图片资料库</a><a class="tab" href="/knowledge">文件中心</a><a id="evaluation-open" hidden class="tab" href="/evaluation" aria-current="page">评测</a></nav>
+    <nav class="topnav" aria-label="账号"><span id="evaluation-account" class="account-badge">正在连接</span></nav>
+  </header>
+  <div id="evaluation-notice" class="evaluation-notice" role="status" hidden></div>
+  <main id="evaluation-workspace" class="evaluation-workspace" hidden>
+    <aside class="evaluation-side">
+      <span class="tiny-label">EVALUATION</span>
+      <h1>检索得准不准，<br />权限漏没漏。</h1>
+      <p class="muted">这里只读展示已保存的评测报告。评测在命令行运行，页面不会发起评测，也不会调用模型。</p>
+      <p id="evaluation-tenant" class="evaluation-tenant"></p>
+      <div class="evaluation-side-head"><span class="tiny-label">已保存的报告</span><button id="evaluation-refresh" class="secondary-button" type="button">刷新</button></div>
+      <ol id="evaluation-list" class="evaluation-list" aria-label="已保存的评测报告"></ol>
+      <details class="evaluation-howto">
+        <summary>如何生成报告</summary>
+        <p>在服务所在的机器上运行下面的命令。报告保存在数据目录里，点击“刷新”后出现在这里。</p>
+        <pre><code>adaptive-rag eval-permissions --tenant &lt;租户&gt;
+adaptive-rag eval --tenant &lt;租户&gt; --fixture &lt;标注文件.jsonl&gt;</code></pre>
+        <p>权限矩阵不调用模型。检索评测按当前配置的检索方式运行，配置为云端模型时会产生模型调用。</p>
+      </details>
+    </aside>
+    <section id="evaluation-detail" class="evaluation-detail" aria-busy="false" aria-label="报告详情">
+      <div class="plain-empty">正在读取评测报告。</div>
+    </section>
+    <div id="evaluation-status" class="sr-only" role="status"></div>
+  </main>
+</body>
+</html>

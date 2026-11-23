@@ -1,0 +1,14 @@
+[Unit]
+Description=Offline RAG trash collection (%i)
+Requires=docker.service
+After=docker.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/rag-retention/%i.conf
+ExecStart=/usr/local/libexec/rag-retention run
+ExecStopPost=/usr/local/libexec/rag-retention recover
+StateDirectory=rag-retention-%i
+TimeoutStartSec=infinity
+TimeoutStopSec=5min
+UMask=0077

@@ -1,0 +1,8 @@
+# Standalone configuration follows the official embedded-etcd/local-storage
+# topology. No etcd, Milvus RPC or health port is published to the host.
+mq:
+  type: woodpecker
+woodpecker:
+  storage:
+    type: local
+    rootPath: /var/lib/milvus/woodpecker

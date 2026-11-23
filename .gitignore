@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.rag-data/
+.demo-data/
+.pytest_cache/
+.coverage
+htmlcov/
+build/
+dist/
+.artifacts/
+.env
+.env.*
+!.env.example
+config.local.toml
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+
+# Local material is not part of the example corpus.
+/local-notes/
+/*.pdf

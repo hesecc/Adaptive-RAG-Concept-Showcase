@@ -1,0 +1,28 @@
+# Public, secret-free example. Paths are relative to this file.
+# If copied to the repository root, change this value to ".rag-data".
+data_dir = "../.rag-data"
+host = "127.0.0.1"
+port = 8000
+parent_chars = 1600
+child_chars = 320
+overlap_chars = 40
+candidate_limit = 50
+max_subqueries = 3
+max_lanes = 12
+max_retries = 1
+evidence_chars = 12000
+timeout_seconds = 12.0
+stage_timeout_seconds = 5.0
+
+[plugins]
+lexical = "bm25"
+fusion = "rrf"
+generator = "disabled"
+dense = "disabled"
+
+# Add a trusted mapping locally, with a newly generated random token.
+# [api_tokens."YOUR_RANDOM_TOKEN_AT_LEAST_24_CHARACTERS"]
+# tenant_id = "demo"
+# subject_id = "admin"
+# groups = []
+# admin = true

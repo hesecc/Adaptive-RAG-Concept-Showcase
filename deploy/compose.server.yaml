@@ -1,0 +1,55 @@
+name: an-rag
+
+# Install as /opt/adaptive-rag/compose.yaml after checking host resource/port budgets.
+# Use: docker compose --project-name an-rag --env-file /opt/adaptive-rag/deployment.env \
+#        -f /opt/adaptive-rag/compose.yaml up -d --wait
+services:
+  api:
+    image: ${RAG_IMAGE:?Set the immutable release image in deployment.env}
+    restart: unless-stopped
+    init: true
+    user: "10001:10001"
+    read_only: true
+    env_file:
+      - path: /opt/adaptive-rag/config/app.env
+        required: true
+        format: raw
+    environment:
+      RAG_DATA_DIR: /data
+      PYTHONDONTWRITEBYTECODE: "1"
+    ports:
+      - "127.0.0.1:18000:8000"
+    volumes:
+      - type: bind
+        source: /opt/adaptive-rag/data
+        target: /data
+        bind:
+          create_host_path: false
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    # Confirm available server capacity before increasing these limits.
+    cpus: "1.0"
+    mem_limit: 768m
+    pids_limit: 128
+    stop_grace_period: 150s
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - app
+
+networks:
+  app:
+    name: an-rag-app

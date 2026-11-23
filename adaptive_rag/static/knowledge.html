@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#2b2a28" />
+  <title>文件中心 · Adaptive RAG</title>
+  <link rel="icon" href="/static/mark.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/static/app.css" />
+  <link rel="stylesheet" href="/static/knowledge.css" />
+  <script src="/static/page-owner.js" defer></script>
+  <script src="/static/domain-controls.js" defer></script>
+  <script src="/static/file-center.js" defer></script>
+  <script src="/static/file-editor.js" defer></script>
+  <script src="/static/file-detail.js" defer></script>
+  <script src="/static/knowledge.js" defer></script>
+</head>
+<body class="knowledge-page">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Adaptive RAG 首页"><svg class="brand-mark" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect class="m-fill" width="36" height="36" rx="10" /><path class="m-cut" d="M18 6 32 30H4Z" /><path class="m-fill" d="m18 16 8 14H10Z" /></svg><b>Adaptive RAG</b></a>
+    <nav class="tabs" aria-label="页面"><a class="tab" href="/">检索工作台</a><a class="tab" href="/images">图片资料库</a><a class="tab" href="/knowledge" aria-current="page">文件中心</a><a id="evaluation-open" hidden class="tab" href="/evaluation">评测</a></nav>
+    <nav class="topnav" aria-label="账号"><span id="knowledge-account" class="account-badge">正在连接</span></nav>
+  </header>
+  <div id="knowledge-notice" class="knowledge-notice" role="status" hidden></div>
+  <main id="knowledge-workspace" class="file-center" hidden>
+    <header class="file-heading"><div><h1>文件中心</h1><p id="knowledge-domains" class="muted"></p></div>
+      <div class="file-actions"><button id="knowledge-refresh" type="button">刷新</button><button id="file-add" class="primary-button" type="button">添加文件</button></div>
+    </header>
+    <div class="file-views" role="group" aria-label="文件范围"><button data-view="all" aria-pressed="true">全部文件</button><button data-view="mine" aria-pressed="false">我的上传</button><button data-view="trash" aria-pressed="false">回收站</button></div>
+    <div class="file-filters">
+      <label>查找文件<input type="search" id="file-query" placeholder="标题、ID 或所有者" /></label>
+      <label>类型<select id="file-kind"><option value="">全部类型</option><option value="document">文档</option><option value="image">图片</option></select></label>
+      <label>状态<select id="file-status"><option value="">全部状态</option></select></label>
+      <span id="knowledge-count" role="status"></span>
+    </div>
+    <div id="file-list" aria-live="polite"></div><p id="knowledge-generation" class="file-meta"></p>
+  </main>
+  <dialog id="file-editor" aria-labelledby="editor-heading"><form id="editor-form" method="post">
+    <header class="file-heading"><h2 id="editor-heading">添加文件</h2><button type="button" data-close aria-label="关闭">×</button></header>
+    <fieldset id="editor-fields">
+      <label>文件类型<select id="editor-kind"><option value="document">文本文档</option><option value="parse">PDF / Office 文档（MinerU）</option><option value="image">图片</option></select></label>
+      <label id="editor-upload-label"><span id="editor-upload-title">读取本地文件</span><input type="file" id="editor-upload" /></label>
+      <p class="file-meta" id="editor-hint"></p>
+      <div id="editor-notice" hidden>
+        <p id="editor-disclosure">提交后，完整原文件将发送给外部 MinerU 云服务解析。请确认此文件允许对外发送。</p>
+        <label><input type="checkbox" id="editor-consent" aria-describedby="editor-disclosure" /> 我同意将本次所选文件发送给 MinerU。</label>
+      </div>
+      <label>标题<input id="editor-title" required maxlength="256" /></label>
+      <label>文件 ID<input id="editor-id" required maxlength="128" /></label>
+      <label id="editor-version-label">内容版本<input id="editor-version" required maxlength="128" /></label>
+      <div id="editor-text-fields"><label>正文格式<select id="editor-format"><option value="text/markdown">Markdown</option><option value="text/plain">纯文本</option><option value="text/html">HTML</option></select></label>
+        <label>正文<textarea id="editor-content" rows="7" maxlength="2000000"></textarea></label></div>
+      <div id="editor-image-fields" hidden><label>图片说明<textarea id="editor-description" maxlength="16000"></textarea></label>
+        <label>图片文字<textarea id="editor-ocr" maxlength="32000"></textarea></label><label>标签（逗号分隔）<input id="editor-tags" /></label></div>
+      <fieldset id="editor-domain-fields"><legend>数据分类</legend><div id="editor-domains"></div><p class="file-meta">不选择分类的文档将保留为未分类，等待管理员审核。</p></fieldset>
+    </fieldset>
+    <p id="editor-status" role="status"></p><p id="editor-error" role="alert"></p><button id="editor-save" class="primary-button" type="submit">保存</button>
+  </form></dialog>
+  <dialog id="file-detail" aria-labelledby="detail-heading"><header class="file-heading"><h2 id="detail-heading">文件详情</h2><button type="button" data-close aria-label="关闭">×</button></header><div id="detail-body"></div></dialog>
+</body>
+</html>

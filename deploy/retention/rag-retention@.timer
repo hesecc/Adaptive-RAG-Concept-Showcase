@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily seven-day trash collection (%i)
+
+[Timer]
+OnCalendar=*-*-* 03:15:00 UTC
+RandomizedDelaySec=5m
+Persistent=true
+Unit=rag-retention@%i.service
+
+[Install]
+WantedBy=timers.target

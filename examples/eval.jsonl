@@ -1,0 +1,3 @@
+{"id":"return-policy","question":"演示商店退货规则是什么？","gold_document_ids":["store-policy"]}
+{"id":"a100-warranty","question":"A100 保修规则是什么？","sku":"A100","gold_document_ids":["a100-warranty"]}
+{"id":"unsupported-topic","question":"火星轨道卫星数量","gold_document_ids":[]}

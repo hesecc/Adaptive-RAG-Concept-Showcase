@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="dark" />
+  <meta name="theme-color" content="#2b2a28" />
+  <title>图片资料库 · Adaptive RAG</title>
+  <link rel="icon" href="/static/mark.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/static/app.css" />
+  <link rel="stylesheet" href="/static/images.css" />
+  <script src="/static/page-owner.js" defer></script>
+  <script src="/static/domain-controls.js" defer></script>
+  <script src="/static/images.js" defer></script>
+</head>
+<body class="image-page">
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Adaptive RAG 首页"><svg class="brand-mark" width="36" height="36" viewBox="0 0 36 36" aria-hidden="true"><rect class="m-fill" width="36" height="36" rx="10" /><path class="m-cut" d="M18 6 32 30H4Z" /><path class="m-fill" d="m18 16 8 14H10Z" /></svg><b>Adaptive RAG</b></a>
+    <nav class="tabs" aria-label="页面"><a class="tab" href="/">检索工作台</a><a class="tab" href="/images" aria-current="page">图片资料库</a><a id="knowledge-open" class="tab" href="/knowledge" hidden>文件中心</a><a id="evaluation-open" class="tab" href="/evaluation" hidden>评测</a></nav>
+    <nav class="topnav" aria-label="账号"><span id="image-account" class="account-badge">正在连接</span></nav>
+  </header>
+  <main class="image-workspace">
+    <aside class="image-sidebar">
+      <span class="tiny-label">IMAGE KNOWLEDGE</span>
+      <h1>用一句话，<br />找到需要的图。</h1>
+      <p class="muted">根据图片的标题、说明、标签与已有 OCR 检索，结果直接关联原图。</p>
+      <form id="image-search-form">
+        <label for="image-question">描述你要找的图片</label>
+        <textarea id="image-question" rows="4" maxlength="4000" required placeholder="例如：展示文档解析到带引用回答的 RAG 流程图"></textarea>
+        <button id="image-search-submit" class="primary-button" type="submit">检索图片 <span>↗</span></button>
+      </form>
+      <button id="image-refresh" class="secondary-button" type="button">查看全部图片</button>
+      <div class="image-mode" id="image-mode">读取当前能力中</div>
+      <p id="image-domains" class="account-domains"></p>
+      <section id="image-admin" hidden>
+        <div class="section-top"><h2>图片管理</h2><span class="small-pill">管理员</span></div>
+        <button id="image-upload-open" class="primary-button" type="button">＋ 添加图片资料</button>
+        <button id="image-index" class="secondary-button" type="button">处理待建索引</button>
+        <p class="muted">修改描述后需要更新索引。图片保存状态与语义索引状态分别显示。</p>
+      </section>
+    </aside>
+    <section class="image-content">
+      <div class="image-heading"><div><span class="tiny-label">ASSET LIBRARY</span><h2 id="image-results-heading">图片资料</h2></div><span id="image-count" class="small-pill">—</span></div>
+      <div id="image-notice" role="status" class="image-notice" hidden></div>
+      <div id="image-results" class="image-grid"><div class="plain-empty">正在读取图片资料。</div></div>
+    </section>
+    <aside class="image-trace">
+      <span class="tiny-label">RETRIEVAL TRACE</span>
+      <h2>本次检索过程</h2>
+      <p class="muted">每一步展示实际状态、耗时和返回内容。</p>
+      <div class="image-trace-id"><span>Trace ID</span><code id="image-trace-id">提交检索后生成</code></div>
+      <p id="image-trace-summary" class="image-trace-summary" aria-live="polite"></p>
+      <div id="image-stages" class="image-stages"><div class="plain-empty">等待发起图片检索。</div></div>
+      <form id="image-trace-form"><label for="image-trace-input">回放历史检索</label><input id="image-trace-input" placeholder="输入 Trace ID" required /><button class="secondary-button" type="submit">读取记录</button></form>
+    </aside>
+  </main>
+  <dialog id="image-original" class="modal wide-modal">
+    <div class="modal-heading"><h2>原图</h2><button id="image-original-close" class="icon-button" type="button" aria-label="关闭">×</button></div>
+    <img id="image-original-content" alt="" />
+  </dialog>
+  <dialog id="image-editor" class="modal wide-modal">
+    <div class="modal-heading"><h2 id="image-editor-heading">添加图片资料</h2><button id="image-editor-close" class="icon-button" type="button" aria-label="关闭">×</button></div>
+    <form id="image-edit-form" class="image-edit-form">
+      <label id="image-file-label" for="image-file">图片文件（PNG、JPEG、WebP，最多 10MB）<input id="image-file" type="file" accept="image/png,image/jpeg,image/webp" /></label>
+      <label for="image-title">标题<input id="image-title" maxlength="256" required placeholder="RAG 系统完整流程图" /></label>
+      <label for="image-description">语义描述<textarea id="image-description" rows="4" maxlength="16000" placeholder="说明图片的主题、包含的步骤和关键细节；检索根据这里的文字进行。"></textarea></label>
+      <label for="image-tags">标签（用逗号分隔）<input id="image-tags" maxlength="2000" placeholder="RAG, 架构图, 产品培训" /></label>
+      <label for="image-ocr">已有 OCR／图中文字<textarea id="image-ocr" rows="3" maxlength="32000" placeholder="可选：粘贴图片中已提取的文字。"></textarea></label>
+      <fieldset class="image-domain-field"><legend>允许访问的数据分类（必选）</legend><div id="image-data-domains"></div></fieldset>
+      <p class="muted">选择公共表示向所有成员开放；业务分类只向拥有对应权限的账号开放。修改分类会更新资料版本，旧检索记录将重新鉴权。</p>
+      <p class="muted">标题也会参与检索。补充说明、标签或已有 OCR 可改善结果；系统不会自动识别图片内容。</p>
+      <div id="image-edit-error" class="form-error" role="alert"></div>
+      <button id="image-save" class="primary-button" type="submit">保存图片资料</button>
+    </form>
+  </dialog>
+</body>
+</html>

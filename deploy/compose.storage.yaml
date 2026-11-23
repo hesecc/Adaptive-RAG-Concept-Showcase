@@ -1,0 +1,133 @@
+name: an-rag-storage
+
+# A separate, opt-in topology. Do not overlay this on compose.server.yaml.
+# Runtime secrets live in RAG_STORAGE_APP_ENV_FILE, outside the checkout.
+x-app: &app
+  image: ${RAG_IMAGE:?Set the immutable application image}
+  restart: unless-stopped
+  init: true
+  user: "10001:10001"
+  read_only: true
+  env_file:
+    - path: ${RAG_STORAGE_APP_ENV_FILE:?Set an absolute private app.env path}
+      required: true
+      format: raw
+  environment:
+    RAG_DATA_DIR: /data
+    PYTHONDONTWRITEBYTECODE: "1"
+  volumes:
+    - type: bind
+      source: ${RAG_STORAGE_DATA_DIR:?Set an independent absolute data directory}
+      target: /data
+      bind:
+        create_host_path: false
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m,mode=1777
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  pids_limit: 128
+  stop_grace_period: 150s
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  networks: [storage]
+
+services:
+  postgres:
+    image: postgres:17.12-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: rag
+      POSTGRES_USER: rag
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+    secrets: [postgres_password]
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U rag -d rag"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    cpus: "1.0"
+    mem_limit: 1g
+    pids_limit: 128
+    stop_grace_period: 60s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks: [storage]
+
+  milvus:
+    image: milvusdb/milvus:v2.6.26
+    command: [milvus, run, standalone]
+    restart: unless-stopped
+    # Upstream standalone uses embedded etcd and local storage, including WAL.
+    # This storage is independent of the S3 service holding application images.
+    environment:
+      ETCD_USE_EMBED: "true"
+      ETCD_DATA_DIR: /var/lib/milvus/etcd
+      ETCD_CONFIG_PATH: /milvus/configs/embedEtcd.yaml
+      COMMON_STORAGETYPE: local
+      DEPLOY_MODE: STANDALONE
+    security_opt: [seccomp:unconfined]
+    volumes:
+      - milvus_data:/var/lib/milvus
+      - ./milvus/embedEtcd.yaml:/milvus/configs/embedEtcd.yaml:ro
+      - ./milvus/user.yaml:/milvus/configs/user.yaml:ro
+    healthcheck:
+      test: [CMD, curl, -f, http://127.0.0.1:9091/healthz]
+      interval: 30s
+      timeout: 20s
+      start_period: 90s
+      retries: 5
+    cpus: "2.0"
+    mem_limit: 8g
+    pids_limit: 512
+    stop_grace_period: 120s
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+    networks: [storage]
+
+  api:
+    <<: *app
+    ports:
+      - "127.0.0.1:${RAG_STORAGE_API_PORT:-18010}:8000"
+    depends_on:
+      postgres: {condition: service_healthy}
+      milvus: {condition: service_healthy}
+    cpus: "1.0"
+    mem_limit: 768m
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health',timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+  asset-worker:
+    <<: *app
+    command: [python, -m, adaptive_rag.asset_worker, --tenant, "${RAG_STORAGE_TENANT:?Set the existing browser tenant}", --interval, "10"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      milvus: {condition: service_healthy}
+    cpus: "1.0"
+    mem_limit: 512m
+
+secrets:
+  postgres_password:
+    file: ${RAG_POSTGRES_PASSWORD_FILE:?Set an absolute private PostgreSQL password file}
+
+# Compose prefixes all names with the explicit project name. No existing
+# an-rag or other application's volumes/networks are shared implicitly.
+volumes:
+  postgres_data:
+  milvus_data:
+networks:
+  storage:

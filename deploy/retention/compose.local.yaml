@@ -1,0 +1,4 @@
+services:
+  api:
+    entrypoint: [python, -m, adaptive_rag.retention_cli, writer]
+    command: [uvicorn, 'adaptive_rag.server:create', --factory, --host, '0.0.0.0', --port, '8000', --no-access-log]

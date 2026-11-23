@@ -1,0 +1,9 @@
+*
+!Dockerfile
+!pyproject.toml
+!uv.lock
+!README.md
+!adaptive_rag/
+!adaptive_rag/**
+**/__pycache__/
+**/*.pyc
