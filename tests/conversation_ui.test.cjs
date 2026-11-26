@@ -24,6 +24,7 @@ class Element {
   get textContent() { return this.children.map(n => n.textContent ?? n).join(''); }
   set textContent(value) { this.children = [String(value)]; }
   get childElementCount() { return this.children.length; }
+  get tagName() { return this.tag?.toUpperCase(); }
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.children = nodes; }
   setAttribute(key, value) { this[key] = value; }
@@ -44,7 +45,7 @@ async function workbench(route, bookmark = null, owner = alice, browser = {}) {
   const nodes = new Map([...html.matchAll(/id="([\w-]+)"/g)].map(m => ['#' + m[1], new Element()]));
   for (const key of ['.account-avatar', '#run-button span']) nodes.set(key, new Element());
   const get = key => { assert.ok(nodes.has(key), 'missing element ' + key); return nodes.get(key); };
-  const document = {querySelector: get, querySelectorAll: sel => sel.includes('#conversation-list button') ?
+  const document = {querySelector: key => browser.missingCaption && key === '#evidence-caption' ? null : get(key), querySelectorAll: sel => sel.includes('#conversation-list button') ?
     [...get('#conversation-list').buttons(), ...get('#chat-history').buttons()] : [],
     addEventListener() {}, createElement: tag => new Element(tag), createElementNS: (_, tag) => new Element(tag), createTextNode: String};
   const history = {state: {ragConversation: bookmark}, replaceState(value) { this.state = value; }};
@@ -79,18 +80,18 @@ const citedResult = {trace_id: 'cited', generation: 'edition', status: 'answered
   answer: '第一项结论 [' + sourceB + ']\n第二项结论 [' + sourceA + ']', claims: [
     {text: '第一项结论', evidence_ids: [sourceB]}, {text: '第二项结论', evidence_ids: [sourceA]},
   ]};
-async function citedWorkbench(result, restore = false) {
-  const record = {...trace('cited'), final_result: result};
+async function citedWorkbench(result, restore = false, details = {}, browser = {}) {
+  const record = {...trace('cited'), ...details, final_result: result};
   return workbench(url => {
     if (url.startsWith('/conversations?')) return page([]);
     if (url === '/query/stream') return sse([['result', {result, trace: record}]]);
-    if (url === '/conversations/group') return {conversation_id: 'group', turns: [{...turn('cited'), answer: result.answer}, turn('later')]};
+    if (url === '/conversations/group') return {conversation_id: 'group', turns: [{...turn('cited'), status: result.status, answer: result.answer}, turn('later')]};
     if (url === '/traces/later') return trace('later');
     if (url === '/traces/cited') return record;
     for (const item of excerpts) if (url === '/evidence/edition/' + item.evidence_id)
       return {...item, text: 'authorized original: ' + item.document_id};
     throw Error('Unexpected fixture request: ' + url);
-  }, restore ? {subject: 'alice', tenant: 'home', id: 'group'} : null);
+  }, restore ? {subject: 'alice', tenant: 'home', id: 'group'} : null, alice, browser);
 }
 
 const legacyInsufficient = '找到了相关内容，但不足以完整支持这个问题，暂不生成答案；列出的是最接近的资料。';
@@ -157,6 +158,75 @@ test('claims appear once in answer order and each inline source opens its own au
     assert.ok(get('#source-content').textContent.includes('authorized original: doc-' + expected));
     get('#source-dialog').close();
   }
+});
+
+test('adjacent claims share source controls only within the same section and citation set', async () => {
+  const result = {...citedResult, claims: [
+    {text: '## 预测\n输入逐层传递。', evidence_ids: [sourceB]},
+    {text: '输出层给出预测。', evidence_ids: [sourceB]},
+    {text: '还有一个过程。\n## 训练\n用损失衡量预测差距。', evidence_ids: [sourceB]},
+    {text: '后续步骤依据两个来源。', evidence_ids: [sourceA, sourceB]},
+    {text: '同一组证据，顺序不同。', evidence_ids: [sourceB, sourceA]},
+    {text: '不同证据。', evidence_ids: [sourceA]},
+  ]};
+  const {get, submit} = await citedWorkbench(result);
+  await submit('神经网络如何工作？');
+  const blocks = get('#panel-answer').tags('div').filter(node => node.className === 'answer-paragraph');
+  assert.deepEqual(blocks.map(block => block.buttons().map(button => button.textContent)),
+    [['来源 2'], ['来源 2'], ['来源 1', '来源 2'], ['来源 1']]);
+  assert.match(blocks[0].textContent, /输入逐层传递。.*输出层给出预测。.*来源 2/s);
+  assert.match(blocks[1].textContent, /训练.*损失/s);
+  assert.match(blocks[2].textContent, /顺序不同/);
+  await blocks[0].buttons()[0].fire('click');
+  assert.match(get('#source-content').textContent, /authorized original: doc-1/);
+});
+
+test('counts distinct available citations and shows the remaining question in human-readable terms', async () => {
+  const result = {...citedResult, status: 'partial', missing_query_ids: ['q2', 'q3'], claims: [
+    {text: '整机保修十二个月。', evidence_ids: [sourceA]},
+    {text: '人为损坏除外。', evidence_ids: [sourceA]},
+  ]};
+  const details = {subqueries: [{query_id: 'q2', text: '维修需要什么？'}],
+    verification: {missing_queries: [{query_id: 'q2', text: '申请维修需要哪些凭证？'}]}};
+  const {get, submit} = await citedWorkbench(result, false, details);
+  await submit('保修多久？维修需要什么？');
+  assert.equal(get('#metric-evidence').textContent, '2');
+  assert.equal(get('#evidence-caption').textContent, '正文引用 1 条');
+  const panel = get('#panel-answer');
+  assert.match(panel.textContent, /仍缺少证据的部分.*申请维修需要哪些凭证/s);
+  assert.doesNotMatch(panel.textContent, /q2|q3|维修需要什么/);
+
+  const restored = await citedWorkbench(result, true, details);
+  const history = restored.get('#chat-history');
+  await history.buttons().find(button => button.textContent.startsWith('查看本轮流程')).fire('click');
+  assert.match(history.textContent, /仍缺少证据的部分.*申请维修需要哪些凭证/s);
+  assert.doesNotMatch(history.textContent, /q2|q3/);
+  await history.buttons().find(button => button.textContent.startsWith('查看本轮流程')).fire('click');
+  assert.match(history.textContent, /现有资料只支持上述内容/);
+
+  const noNamedGap = await citedWorkbench(result, false, {subqueries: details.subqueries});
+  await noNamedGap.submit('保修？');
+  assert.match(noNamedGap.get('#panel-answer').textContent, /现有资料只支持上述内容/);
+  assert.doesNotMatch(noNamedGap.get('#panel-answer').textContent, /维修需要什么/);
+
+  const citationOnly = await citedWorkbench({...result, status: 'answered'}, false,
+    {subqueries: details.subqueries, coverage: {missing_query_ids: ['q2']}}, {missingCaption: true});
+  await citationOnly.submit('保修？');
+  assert.equal(citationOnly.get('#metric-evidence').textContent, '2');
+  assert.match(citationOnly.get('#panel-answer').textContent, /仍缺少证据的部分.*维修需要什么/s);
+
+  const unknown = 'f'.repeat(64) + '.9.' + 'f'.repeat(16);
+  const legacy = await citedWorkbench({...result, claims: [],
+    answer: `整机保修十二个月。 [${sourceA}] [${unknown}]`});
+  await legacy.submit('保修多久？');
+  assert.equal(legacy.get('#evidence-caption').textContent, '正文引用 1 条');
+  assert.deepEqual(legacy.get('#panel-answer').buttons().map(button => button.textContent), ['来源 1']);
+
+  const preview = await citedWorkbench({...insufficientResult, status: 'evidence_preview'});
+  await preview.submit('保修？');
+  assert.equal(preview.get('#metric-evidence').textContent, '2');
+  assert.equal(preview.get('#evidence-caption').textContent, '正文引用 0 条');
+  assert.doesNotMatch(preview.get('#panel-answer').textContent, /q1|仍缺少证据的部分/);
 });
 
 test('formats claims safely and charts only complete cited source data', async () => {

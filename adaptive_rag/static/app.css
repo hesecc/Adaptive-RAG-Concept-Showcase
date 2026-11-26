@@ -1335,8 +1335,8 @@ input[type=checkbox]:disabled {
   margin-top: .85em;
 }
 
-.answer-reader .answer-paragraph:first-child:not(:only-child) {
-  font-weight: 550;
+.answer-reader .answer-prose + .answer-prose {
+  margin-block-start: .35em;
 }
 
 .query-options {
@@ -1430,6 +1430,8 @@ input[type=checkbox]:disabled {
 @media (pointer: coarse) {
   .citation-button { min-height: 32px; padding-inline: 9px; }
 }
+
+.missing-box ul { margin: 4px 0 0; padding-inline-start: 1.4em; overflow-wrap: anywhere; }
 
 .missing-box {
   margin-top: 18px;
@@ -2660,7 +2662,7 @@ pre {
     font-size: 20px;
   }
 
-  .metric > span:last-child {
+  .metric > span:last-child:not(#evidence-caption) {
     display: none;
   }
 

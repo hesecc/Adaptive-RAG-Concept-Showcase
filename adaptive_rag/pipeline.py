@@ -531,9 +531,10 @@ class QueryPipeline:
                 if not (await CitationVerifier().verify(value, items)).valid:
                     raise ValidationError("citation verification failed")
                 return value
+            generation_plan = replace(plan, original_question=trace["question"])
             if self.descriptions["generator"]["enabled"]:
                 generation_queries = tuple(q for q in queries if not semantic_coverage or q.query_id in coverage.covered_query_ids)
-                draft = await stage("generator", self.c["generator"].generate, replace(plan, queries=generation_queries), evidence,
+                draft = await stage("generator", self.c["generator"].generate, replace(generation_plan, queries=generation_queries), evidence,
                                     validate=lambda value: checked_draft(value, evidence))
                 output("generator", {"answer_present": draft.answer is not None,
                        "claim_count": len(draft.claims), "verification_pending": True})
@@ -570,7 +571,7 @@ class QueryPipeline:
                 evidence, changed = await recover(gap_queries, evidence, "answer")
                 if changed and (coverage.basis != "cloud_semantic_sufficiency" or coverage.covered_query_ids):
                     generation_queries = tuple(q for q in queries if coverage.basis != "cloud_semantic_sufficiency" or q.query_id in coverage.covered_query_ids)
-                    draft = await stage("generator.retry", self.c["generator"].generate, replace(plan, queries=generation_queries), evidence,
+                    draft = await stage("generator.retry", self.c["generator"].generate, replace(generation_plan, queries=generation_queries), evidence,
                                         validate=lambda value: checked_draft(value, evidence))
                     output("generator.retry", {"answer_present": draft.answer is not None,
                            "claim_count": len(draft.claims), "verification_pending": True})

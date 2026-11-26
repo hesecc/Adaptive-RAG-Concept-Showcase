@@ -164,6 +164,8 @@ class QualityPipelineTests(unittest.IsolatedAsyncioTestCase):
             async def assess(self, queries, evidence): return Coverage(("q1",), (), "cloud_semantic_sufficiency")
         class Generator:
             async def generate(self, plan, evidence):
+                if plan.original_question != "质保":
+                    raise AssertionError("generator needs the original question")
                 return Draft("unsafe free text", (Claim("整机质保两年", (evidence[0].evidence_id,)),
                     Claim("政策说明存在", (evidence[0].evidence_id,))), "fixture")
         class Verifier:

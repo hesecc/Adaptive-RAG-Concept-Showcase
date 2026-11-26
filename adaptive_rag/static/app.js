@@ -804,6 +804,8 @@ function resetCurrent() {
   $("#metric-stages").textContent = "0";
   $("#metric-lanes").textContent = "—";
   $("#metric-evidence").textContent = "—";
+  const evidenceCaption = $("#evidence-caption");
+  if (evidenceCaption) evidenceCaption.textContent = "正文引用 —";
   $("#duration-caption").textContent = "等待服务器执行";
   $("#stages-caption").textContent = "按实际运行记录";
   $("#stage-count").textContent = "0";
@@ -1194,15 +1196,24 @@ function renderMetrics() {
     $("#metric-lanes").textContent = number(
       state.trace.lane_count ?? state.trace.retrieval_lanes?.length ?? 0,
     );
-    $("#metric-evidence").textContent = number(
-      state.result?.evidence?.length ?? state.trace.evidence?.length ?? 0,
-    );
   } else {
     $("#metric-lanes").textContent = String(
       state.stages.filter((stage) =>
         /^(lexical|dense)\./.test(stage?.name || ""),
       ).length,
     );
+  }
+  if (state.result || state.trace) {
+    const evidence = state.result?.evidence ?? state.trace?.evidence ?? [];
+    $("#metric-evidence").textContent = number(evidence.length);
+    const evidenceCaption = $("#evidence-caption");
+    if (evidenceCaption) {
+      const available = new Set((state.result?.evidence || []).map(item => item.evidence_id));
+      const cited = new Set(state.result?.answer
+        ? answerClaims(state.result).flatMap(claim => claim.evidence_ids || []).filter(id => available.has(id))
+        : []);
+      evidenceCaption.textContent = `正文引用 ${number(cited.size)} 条`;
+    }
   }
 }
 
@@ -1403,23 +1414,40 @@ function answerCitation(item, position) {
   return button;
 }
 
+function answerClaims(result) {
+  return result.claims?.length ? result.claims : legacyParagraphs(result.answer || "");
+}
+
 function answerReader(result) {
   const reader = el("div", "answer-reader");
+  const visuals = globalThis.RagAnswerVisuals;
   const evidence = new Map((result.evidence || []).map((item, i) => [item.evidence_id, {item, number: i + 1}]));
-  const paragraphs = result.claims?.length ? result.claims : legacyParagraphs(result.answer || "");
-  for (const claim of paragraphs) {
-    const paragraph = el("div", "answer-paragraph");
-    const visuals = globalThis.RagAnswerVisuals;
-    paragraph.append(visuals?.prose(claim.text) || el("p", "", claim.text));
+  let paragraph, previousIds = [];
+  const appendCitations = () => {
+    if (!paragraph) return;
     const citations = el("div", "answer-citations");
-    for (const id of new Set(claim.evidence_ids || [])) {
+    for (const id of previousIds) {
       const source = evidence.get(id);
       if (source) citations.append(answerCitation(source.item, source.number));
     }
     if (citations.childElementCount) paragraph.append(citations);
-    reader.append(paragraph);
+  };
+  for (const claim of answerClaims(result)) {
+    const ids = [...new Set(claim.evidence_ids || [])];
+    const prose = visuals?.prose(claim.text) || el("p", "", claim.text);
+    const startsSection = Array.from(prose.children).some(node => node.tagName === "H4");
+    const continues = !startsSection && ids.length && ids.length === previousIds.length &&
+      ids.every(id => evidence.has(id) && previousIds.includes(id));
+    if (!continues) {
+      appendCitations();
+      paragraph = el("div", "answer-paragraph");
+      reader.append(paragraph);
+      previousIds = ids;
+    }
+    paragraph.append(prose);
   }
-  const charts = globalThis.RagAnswerVisuals?.charts(result, answerCitation);
+  appendCitations();
+  const charts = visuals?.charts(result, answerCitation);
   if (charts) reader.append(charts);
   return reader;
 }
@@ -1454,6 +1482,30 @@ function insufficientReply(result) {
   }
   section.append(list);
   return section;
+}
+
+function hasAnswerGaps(result) {
+  return result.status === "partial" || (result.status === "answered" && !!result.missing_query_ids?.length);
+}
+
+function partialNote(result, trace) {
+  const gaps = [...(trace?.coverage?.missing_queries || []), ...(trace?.verification?.missing_queries || [])];
+  const missing = new Set([...(trace?.coverage?.missing_query_ids || []), ...gaps.map(query => query.query_id)]);
+  const descriptions = new Map();
+  for (const query of [...(trace?.subqueries || []), ...gaps]) {
+    if (query.text?.trim()) descriptions.set(query.query_id, query.text.trim());
+  }
+  const questions = [...new Set((result.missing_query_ids || []).filter(id => missing.has(id))
+    .map(id => descriptions.get(id)).filter(Boolean))];
+  const note = el("div", "missing-box");
+  if (!questions.length) {
+    note.textContent = "现有资料只支持上述内容，其余部分需要补充证据。";
+    return note;
+  }
+  const list = el("ul");
+  for (const question of questions) list.append(el("li", "", question));
+  note.append(el("strong", "", "仍缺少证据的部分"), list);
+  return note;
 }
 
 function renderAnswer() {
@@ -1514,15 +1566,7 @@ function renderAnswer() {
       target.append(gallery);
     }
   }
-  // An empty result already says nothing was found; listing raw sub-question ids next to it is noise.
-  if (result.missing_query_ids?.length && result.status !== "empty")
-    target.append(
-      el(
-        "div",
-        "missing-box",
-        `仍需补充的子问题：${result.missing_query_ids.join("、")}`,
-      ),
-    );
+  if (hasAnswerGaps(result)) target.append(partialNote(result, state.trace));
 }
 
 function renderEvidence() {
@@ -1953,6 +1997,7 @@ function renderChatHistory() {
       answer.append(selected && state.result ? insufficientReply(result) : el("p", "history-answer", noAnswerNotes.insufficient));
     } else if (!result.answer) answer.append(el("p", "history-answer", result.message || noAnswerNotes[result.status] || "本轮没有返回回答。"));
     if (result.answer || (selected && result.status === "evidence_preview")) answer.append(answerReader(result));
+    if (hasAnswerGaps(result)) answer.append(partialNote(result, selected ? state.trace : null));
     const footer = el("div", "history-caption");
     footer.append(el("span", "", statuses[message.status] || message.status));
     const button = el("button", "", selected ? "正在查看本轮流程" : message.status === "insufficient" ? "查看本轮资料与流程 →" : "查看本轮流程 →");

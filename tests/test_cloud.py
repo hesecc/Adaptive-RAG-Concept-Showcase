@@ -356,15 +356,19 @@ class CloudRerankTests(unittest.IsolatedAsyncioTestCase):
 
 
 class CloudGenerationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_generator_receives_source_headings_separate_from_claim_text(self):
+    async def test_generator_receives_original_question_and_source_headings(self):
         seen = []
         def handler(request):
-            seen.append(json.loads(json.loads(request.content)["messages"][1]["content"])["evidence"][0])
+            seen.append(json.loads(json.loads(request.content)["messages"][1]["content"]))
             return httpx.Response(200, json={"choices": [{"message": {"content": '{"claims":[]}'}}]})
         item = replace(evidence(), heading_path=("Warranty policy", "Required materials"))
-        await CloudGenerator(transport(handler)).generate(Plan((SubQuery("q1", "materials"),)), (item,))
-        self.assertEqual(seen[0].get("heading_path"), ["Warranty policy", "Required materials"])
-        self.assertEqual(seen[0]["text"], item.text)
+        question = "How do the required materials differ between warranty and paid repairs?"
+        await CloudGenerator(transport(handler)).generate(
+            Plan((SubQuery("q1", "materials"),), original_question=question), (item,))
+        self.assertEqual(seen[0]["original_question"], question)
+        self.assertEqual(seen[0]["questions"], [{"query_id": "q1", "text": "materials"}])
+        self.assertEqual(seen[0]["evidence"][0]["heading_path"], ["Warranty policy", "Required materials"])
+        self.assertEqual(seen[0]["evidence"][0]["text"], item.text)
 
     async def test_quality_json_mode_explicitly_instructs_json_for_bailian(self):
         from adaptive_rag.quality import CloudEvidenceJudge

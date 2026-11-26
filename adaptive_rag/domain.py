@@ -290,6 +290,7 @@ class Plan:
     sku: str | None = None
     action: str = "retrieve"
     message: str = ""
+    original_question: str = ""
 
 
 @dataclass(frozen=True)
